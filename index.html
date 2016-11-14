@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+	<title>GeoJSON tutorial - Leaflet</title>
+
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.1/dist/leaflet.css"/>
+	<script src="https://unpkg.com/leaflet@1.0.1/dist/leaflet.js"></script>
+	<script src="https://npmcdn.com/@turf/turf@3.5.1/turf.min.js" charset="utf-8"></script>
+
+
+	<style>
+		#map {
+			width: 600px;
+			height: 400px;
+		}
+	</style>
+
+
+</head>
+<body>
+<div id='map'></div>
+<script src="sample-geojson.js" type="text/javascript"></script>
+
+<script>
+	var map = L.map('map').setView([37.783973234795411, -122.395787078980803], 16);
+
+	L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpandmbXliNDBjZWd2M2x6bDk3c2ZtOTkifQ._QA7i5Mpkd_m30IGElHziw', {
+		maxZoom: 18,
+		attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
+		'<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+		'Imagery © <a href="http://mapbox.com">Mapbox</a>',
+		id: 'mapbox.light'
+	}).addTo(map);
+
+	var baseballIcon = L.icon({
+		iconUrl: 'baseball-marker.png',
+		iconSize: [32, 37],
+		iconAnchor: [16, 37],
+		popupAnchor: [0, -28]
+	});
+
+	function onEachFeature(feature, layer) {
+		var popupContent = "<p>I started out as a GeoJSON " +
+				feature.geometry.type + ", but now I'm a Leaflet vector!</p>";
+
+		if (feature.properties && feature.properties.popupContent) {
+			popupContent += feature.properties.popupContent;
+		}
+
+		layer.bindPopup(popupContent);
+		layer.on('click', function (e) {
+			var point = {
+				"type": "Feature",
+				"properties": {},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [e.latlng.lng, e.latlng.lat]
+				}
+			};
+			if (turf.inside(point, e.target.feature)) {
+				var points = turf.explode(e.target.feature).features;
+				var length = points.length;
+				var distance = Infinity;
+				var p = [];
+				for (var i = 0; i < length; i++) {
+					p.push(points[i].geometry.coordinates)
+				}
+				var line = turf.lineString(p);
+				var cPoint = turf.pointOnLine(line, point);
+				getFactual(cPoint, e.target.feature);
+				L.geoJSON([cPoint], {
+					pointToLayer: function (feature, latlng) {
+						return L.circleMarker(latlng, {
+							radius: 8,
+							fillColor: "#FF0000",
+							color: "#FF0000",
+							weight: 1,
+							opacity: 1,
+							fillOpacity: 0.8
+						});
+					}
+				}).addTo(map);
+
+			}
+		});
+	}
+
+
+	L.geoJSON([turf.simplify(turf.convex(turf.explode(campus)), 0, true)], {
+
+		style: function (feature) {
+			return feature.properties && feature.properties.style;
+		},
+
+		onEachFeature: onEachFeature,
+
+		pointToLayer: function (feature, latlng) {
+			return L.circleMarker(latlng, {
+				radius: 8,
+				fillColor: "#ff7800",
+				color: "#000",
+				weight: 1,
+				opacity: 1,
+				fillOpacity: 0.8
+			});
+		}
+	}).addTo(map);
+
+	L.geoJSON(freeBus, {
+
+		filter: function (feature, layer) {
+			if (feature.properties) {
+				// If the property "underConstruction" exists and is true, return false (don't render features under construction)
+				return feature.properties.underConstruction !== undefined ? !feature.properties.underConstruction : true;
+			}
+			return false;
+		},
+
+		onEachFeature: onEachFeature
+	}).addTo(map);
+
+
+	var coorsLayer = L.geoJSON(coorsField, {
+
+		pointToLayer: function (feature, latlng) {
+			return L.marker(latlng, {icon: baseballIcon});
+		},
+
+		onEachFeature: onEachFeature
+	}).addTo(map);
+
+
+	function getFactual(cPoint, polygon) {
+				var RADIUS = 100;
+
+		var KEY = '4wQsppbjRPQT0o5fKWsZmy6Fqdnf0h0X6Pnx8a3W';
+
+		var url = 'http://api.v3.factual.com/t/places?geo={"$circle":{"$center":['
+				+ cPoint.geometry.coordinates[1] + ',' + cPoint.geometry.coordinates[0]
+				+ '],"$meters":' + RADIUS + '}}&KEY=' + KEY;
+
+		var xhr = new XMLHttpRequest();
+		xhr.open('GET', url, true);
+		xhr.addEventListener('load', function (event) {
+			var array = JSON.parse(xhr.response).response.data;
+			var length = array.length;
+			var min = Infinity;
+			var address = "";
+			for (var i = 0; i < length; i++) {
+				if (!turf.inside(turf.point([array[i]['longitude'], array[i]['latitude']]), polygon)) continue;
+				if (array[i]['$distance'] < min) {
+					address = array[i]['address']
+				}
+			}
+			alert(address)
+		}.bind(this), false);
+		xhr.addEventListener('error', function (event) {
+			console.log("error", xhr)
+		}, false);
+		xhr.send(null);
+	}
+
+
+
+
+</script>
+
+
+</body>
+</html>
