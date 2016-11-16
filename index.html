@@ -23,6 +23,7 @@
 </head>
 <body>
 <div id='map'></div>
+<script src="outlines.js" type="text/javascript"></script>
 <script src="sample-geojson.js" type="text/javascript"></script>
 
 <script>
@@ -44,14 +45,6 @@
 	});
 
 	function onEachFeature(feature, layer) {
-		var popupContent = "<p>I started out as a GeoJSON " +
-				feature.geometry.type + ", but now I'm a Leaflet vector!</p>";
-
-		if (feature.properties && feature.properties.popupContent) {
-			popupContent += feature.properties.popupContent;
-		}
-
-	//	layer.bindPopup(popupContent);
 		layer.on('click', function (e) {
 			var point = {
 				"type": "Feature",
@@ -89,6 +82,30 @@
 		});
 	}
 
+
+	var length = buildings999.length;
+	for (var i = 0; i < length; i++) {
+		L.geoJSON([buildings999[i]], {
+
+			style: function (feature) {
+				return feature.properties && feature.properties.style;
+			},
+
+		onEachFeature: onEachFeature,
+
+
+			pointToLayer: function (feature, latlng) {
+				return L.circleMarker(latlng, {
+					radius: 8,
+					fillColor: "#ff7800",
+					color: "#000",
+					weight: 1,
+					opacity: 1,
+					fillOpacity: 0.8
+				});
+			}
+		}).addTo(map);
+	}
 
 	L.geoJSON([turf.simplify(turf.convex(turf.explode(campus)), 0, true)], {
 
@@ -139,7 +156,7 @@
 
 		var KEY = '4wQsppbjRPQT0o5fKWsZmy6Fqdnf0h0X6Pnx8a3W';
 
-		var url = 'https://api.v3.factual.com/t/places?geo={"$circle":{"$center":['
+		var url = 'http://api.v3.factual.com/t/places?geo={"$circle":{"$center":['
 				+ cPoint.geometry.coordinates[1] + ',' + cPoint.geometry.coordinates[0]
 				+ '],"$meters":' + RADIUS + '}}&KEY=' + KEY;
 
